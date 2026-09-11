@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -376,8 +377,8 @@ top10_movies = (
 # 가로 막대그래프
 # ------------------------------------------------------------
 
-# Plotly 가로 막대그래프에서는 아래쪽 데이터가 위에 표시되므로
-# TOP 10 순서대로 보이도록 역순으로 배치
+# 가로 막대그래프에서는 역순으로 넣어야
+# 관객이 많은 영화가 위쪽에 표시됨
 top10_plot = top10_movies.sort_values(
     "일관객합계",
     ascending=True
@@ -400,7 +401,6 @@ fig4 = px.bar(
     }
 )
 
-
 fig4.update_traces(
     hovertemplate=
         "영화: %{y}<br>"
@@ -410,13 +410,11 @@ fig4.update_traces(
     customdata=top10_plot[["10위권에_든_날수"]].values
 )
 
-
 fig4.update_layout(
     xaxis_title="이 기간 일관객 합계(명)",
     yaxis_title="영화",
     height=600
 )
-
 
 st.plotly_chart(
     fig4,
@@ -439,12 +437,142 @@ st.text_area(
 
 
 # ============================================================
-# 5. 다음 그래프를 추가할 공간
+# 5. 월 × 요일별 일관객 합계 히트맵
 # ============================================================
 
 st.divider()
 
-st.header("5. 다음 그래프")
+st.header("5. 월 × 요일별 일관객 합계")
+
+st.write(
+    "날짜에서 월과 요일을 추출해 같은 월과 요일에 해당하는 "
+    "10위권 영화들의 일관객을 모두 합산하여 비교합니다."
+)
+
+
+# ------------------------------------------------------------
+# 날짜에서 월과 요일 추출
+# ------------------------------------------------------------
+
+heatmap_df = df.copy()
+
+# 월
+heatmap_df["월"] = heatmap_df["날짜"].dt.month
+
+# 요일
+# pandas: 월요일=0, 화요일=1, ..., 일요일=6
+weekday_order = [
+    "월요일",
+    "화요일",
+    "수요일",
+    "목요일",
+    "금요일",
+    "토요일",
+    "일요일"
+]
+
+weekday_map = {
+    0: "월요일",
+    1: "화요일",
+    2: "수요일",
+    3: "목요일",
+    4: "금요일",
+    5: "토요일",
+    6: "일요일"
+}
+
+heatmap_df["요일"] = heatmap_df["날짜"].dt.weekday.map(weekday_map)
+
+
+# ------------------------------------------------------------
+# 월 × 요일별 일관객 합계 계산
+# ------------------------------------------------------------
+
+monthly_weekday = (
+    heatmap_df
+    .groupby(["월", "요일"])["일관객"]
+    .sum()
+    .reset_index()
+)
+
+
+# ------------------------------------------------------------
+# 피벗 테이블 생성
+# ------------------------------------------------------------
+
+heatmap_table = monthly_weekday.pivot(
+    index="월",
+    columns="요일",
+    values="일관객"
+)
+
+
+# 요일 순서를 월요일 → 일요일로 고정
+heatmap_table = heatmap_table.reindex(
+    columns=weekday_order
+)
+
+# 월 순서를 1월 → 12월로 정렬
+heatmap_table = heatmap_table.sort_index()
+
+
+# ------------------------------------------------------------
+# 히트맵
+# ------------------------------------------------------------
+
+fig5 = go.Figure(
+    data=go.Heatmap(
+        z=heatmap_table.values,
+        x=weekday_order,
+        y=[f"{month}월" for month in heatmap_table.index],
+        colorscale="Blues",
+        colorbar=dict(
+            title="일관객 합계"
+        ),
+        hovertemplate=
+            "월: %{y}<br>"
+            "요일: %{x}<br>"
+            "일관객 합계: %{z:,.0f}명"
+            "<extra></extra>"
+    )
+)
+
+
+fig5.update_layout(
+    title="월 × 요일별 10위권 일관객 합계",
+    xaxis_title="요일",
+    yaxis_title="월",
+    height=650
+)
+
+
+st.plotly_chart(
+    fig5,
+    use_container_width=True
+)
+
+
+# ------------------------------------------------------------
+# 다섯 번째 그래프 설명
+# ------------------------------------------------------------
+
+st.subheader("📝 이 그래프로 알 수 있는 것")
+
+st.text_area(
+    "그래프에서 발견한 특징을 적어 보세요.",
+    placeholder="예: 특정 월의 주말에 일관객 합계가 높게 나타나는 등 월과 요일에 따라 관객 규모에 차이가 있음을 알 수 있다.",
+    height=100,
+    key="graph5_note"
+)
+
+
+# ============================================================
+# 6. 다음 그래프를 추가할 공간
+# ============================================================
+
+st.divider()
+
+st.header("6. 다음 그래프")
 
 st.info(
     "앞으로 새로운 그래프를 추가할 때 이 구역 아래에 "
@@ -480,4 +608,4 @@ with col3:
         f"{df['날짜'].min().strftime('%Y-%m-%d')} ~ "
         f"{df['날짜'].max().strftime('%Y-%m-%d')}"
     )
-    
+
